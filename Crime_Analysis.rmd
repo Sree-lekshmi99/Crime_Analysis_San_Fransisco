@@ -1,0 +1,612 @@
+
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+
+```{r}
+file_path <- "SF_CrimeData.csv"
+
+my_data <- read.csv("SF_CrimeData.csv")
+
+head(my_data)
+```
+```{r}
+str(my_data)
+```
+```{r}
+library(dplyr)
+
+sampled_data <- my_data %>% sample_n(5)
+
+print(sampled_data)
+```
+```{r}
+column_types <- sapply(my_data, class)
+
+print(column_types)
+```
+```{r}
+missing_values <- is.na(my_data)
+
+# Count the number of missing values in each column
+missing_counts <- colSums(missing_values)
+
+# Print the results
+print(missing_counts)
+```
+```{r}
+cleaned_data <- na.omit(my_data)
+
+# Print the cleaned data
+print(cleaned_data)
+```
+Data Preprocessing
+
+```{r}
+library(gplots)
+
+# Taking a sample of 1000 rows from our dataset
+sampled_data <- as.data.frame(cleaned_data[sample(nrow(cleaned_data), 1000), ])
+
+# Identify numeric columns
+numeric_cols <- sapply(sampled_data, is.numeric)
+numeric_data <- sampled_data[, numeric_cols, drop = FALSE]
+
+# Handling missing values (replacing them with means of their columns)
+numeric_data[is.na(numeric_data)] <- sapply(numeric_data, function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x))
+
+# Compute the correlation matrix
+correlation_matrix <- cor(numeric_data, use = "pairwise.complete.obs")
+
+# Replace NA, NaN, Inf values with zeros
+correlation_matrix[is.na(correlation_matrix) | is.nan(correlation_matrix) | is.infinite(correlation_matrix)] <- 0
+
+# Create a heatmap with the correlation matrix
+heatmap.2(correlation_matrix,
+          col = colorRampPalette(c("blue", "white", "red"))(20),
+          main = "Correlation Heatmap",
+          xlab = "Columns",
+          ylab = "Rows"
+)
+```
+```{r}
+# Detecting outliers
+numeric_columns <- c('PdId', 'IncidntNum', 'Incident.Code', 'X', 'Y')
+
+# Create boxplots for numeric columns
+boxplot(cleaned_data[, numeric_columns], main="Boxplots for Numeric Columns")
+
+# Calculate and print the number of outliers using the IQR method
+outliers <- function(x) {
+  q <- quantile(x, c(0.25, 0.75))
+  iqr <- IQR(x)
+  lower <- q[1] - 1.5 * iqr
+  upper <- q[2] + 1.5 * iqr
+  outliers <- x[x < lower | x > upper]
+  return(outliers)
+}
+
+# Apply the function to each numeric column and print outliers
+for (col in numeric_columns) {
+  cat("Outliers in column", col, ":", length(outliers(cleaned_data[[col]])), "\n")
+  #print(outliers(cleaned_data[[col]]))
+}
+```
+
+```{r}
+# Calculate quartiles and IQR
+Q1 <- quantile(cleaned_data$PdId, 0.25)
+Q3 <- quantile(cleaned_data$PdId, 0.75)
+IQR <- Q3 - Q1
+
+# Define outlier thresholds
+lower_threshold <- Q1 - 1.5 * IQR
+upper_threshold <- Q3 + 1.5 * IQR
+
+```
+
+```{r}
+filtered_data <- my_data %>%
+  filter(PdId >= lower_threshold & PdId <= upper_threshold)
+
+head(filtered_data)
+```
+
+
+```{r}
+frequency_table <- filtered_data %>% 
+  group_by(Category) %>% 
+  summarise(count = n()) %>%
+  arrange(desc(count))
+```
+
+
+```{r}
+
+```
+
+
+
+EDA 
+```{r}
+sampled_data <- filtered_data %>% sample_n(5)
+
+print(sampled_data)
+
+```
+```{r}
+summary(filtered_data$IncidntNum)
+```
+```{r}
+unique_count <- length(unique(filtered_data$IncidntNum))
+
+print(unique_count)
+```
+```{r}
+summary(filtered_data$Category)
+
+```
+
+```{r}
+unique_counts <- table(filtered_data$Category)
+
+print(unique_counts)
+```
+```{r}
+category_counts <- table(filtered_data$Category)
+barplot(category_counts, main="Frequency Count for Category", xlab="Category", ylab="Frequency", col="skyblue", cex.names=0.7)
+```
+```{r}
+category_normalized_counts <- prop.table(table(filtered_data$Category))
+print(category_normalized_counts)
+```
+```{r}
+barplot(category_normalized_counts, main="Normalized Counts for Category", xlab="Category", ylab="Proportion", col="skyblue", cex.names=0.7)
+```
+```{r}
+summary(filtered_data$Descript)
+
+```
+
+```{r}
+result <- filtered_data %>%
+  select(Category, Descript) %>%
+  sample_n(5, replace = FALSE)
+result
+```
+```{r}
+summary(filtered_data$DayOfWeek)
+```
+
+```{r}
+table(filtered_data$DayOfWeek)
+```
+```{r}
+day_counts <- table(filtered_data$DayOfWeek)
+
+# Order the table by counts
+day_counts <- day_counts[order(day_counts)]
+
+# Create a bar plot
+barplot(day_counts, 
+        col = "skyblue",          # Bar color
+        main = "Day of week",     # Main title
+        xlab = "Day",             # X-axis label
+        ylab = "Number of crimes", # Y-axis label
+        ylim = c(0, max(day_counts) + 50), # Adjust the y-axis limits
+        width = 0.7,               # Width of the bars
+        las = 1)                   # Rotate x-axis labels
+
+```
+```{r}
+summary(filtered_data$Date)
+range(filtered_data$Date)
+
+```
+```{r}
+sample_date <- sample(filtered_data$Date, 1)
+sample_date
+```
+```{r}
+filtered_data$Date <- as.POSIXct(filtered_data$Date, format="%m/%d/%Y", tz="UTC")
+
+sample_date <- sample(filtered_data$Date, 1)
+sample_date
+
+```
+```{r}
+filtered_data$length <- as.numeric(difftime(Sys.Date(), filtered_data$Date, units = "days")) / -365
+
+```
+
+```{r}
+filtered_data$Year <- as.integer(format(filtered_data$Date, "%Y"))
+filtered_data$Month <- as.integer(format(filtered_data$Date, "%m"))
+filtered_data$Day <- as.integer(format(filtered_data$Date, "%d"))
+
+# Print the resulting data frame
+head(filtered_data)
+```
+
+```{r}
+year_counts <- table(filtered_data$Year)
+
+# Sort the counts
+sorted_year_counts <- sort(year_counts)
+
+# Print the sorted counts
+print(sorted_year_counts)
+
+barplot(sorted_year_counts,
+         xlab = 'Year',
+        ylab = 'Number of Incidents',
+        col = 'skyblue',  # Adjust the color as needed
+        border = 'black')
+```
+```{r}
+month_counts <- table(filtered_data$Month)
+
+# Sort the counts
+sorted_month_counts <- sort(month_counts)
+
+# Print the sorted counts
+print(sorted_month_counts)
+barplot(sorted_month_counts,
+         xlab = 'Month',
+        ylab = 'Number of Incidents',
+        col = 'skyblue',  # Adjust the color as needed
+        border = 'black')
+
+```
+```{r}
+summary(filtered_data$Time)
+```
+
+```{r}
+time_counts <- table(filtered_data$Time)
+
+top5_times <- head(sort(time_counts, decreasing = TRUE), 5)
+
+print(top5_times)
+```
+```{r}
+time_counts <- table(filtered_data$Time)
+
+bottom5_times <- tail(sort(time_counts), 5)
+
+print(bottom5_times)
+```
+```{r}
+filtered_data$Time_float <- as.numeric(sapply(strsplit(as.character(filtered_data$Time), ":"), function(x) as.numeric(x[1]) + as.numeric(x[2])/60))
+
+# Print the resulting data frame
+print(filtered_data)
+```
+
+```{r}
+hist(filtered_data$Time_float, 
+     breaks = 24,  # Number of bins
+     col = "skyblue",  # Adjust the color as needed
+     alpha = 0.6,  # Transparency
+     xlab = "Time of a day",
+     ylab = "Number of Incidents",
+     xlim = c(0, 24),
+     main = ""
+)
+
+# Add x-axis ticks
+axis(1, at = seq(0, 24, by = 1))
+```
+```{r}
+summary(filtered_data$PdDistrict)
+
+```
+```{r}
+district_counts <- table(filtered_data$PdDistrict)
+sorted_idx <- order(district_counts, decreasing = TRUE)[1:10]
+names <- names(sort(table(filtered_data$PdDistrict), decreasing = TRUE))[1:10]
+
+# Create a horizontal bar plot
+barplot(district_counts[sorted_idx], 
+        names.arg = names[sorted_idx], 
+        horiz = TRUE, 
+        col = '#7A68A6', 
+        main = 'PdDistrict (Top 10)', 
+        xlab = 'Number of incidents',
+        cex.names = 0.7  # Adjust label size as needed
+)
+```
+```{r}
+head(filtered_data)
+
+```
+```{r}
+install.packages("gplots")
+```
+```{r}
+library(gplots)
+
+```
+
+Time Series 
+
+```{r}
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(lubridate)
+library(ggplot2)
+
+```
+
+```{r}
+install.packages(c("forecast", "tseries"))
+
+```
+
+```{r}
+library(forecast)
+library(tseries)
+```
+```{r}
+head(filtered_data)
+```
+```{r}
+filtered_data <- filtered_data %>%
+  mutate(Date = as.Date(Date, format = "%m/%d/%Y")) %>%
+  filter(year(Date) != 2018)
+head(filtered_data$Date)
+```
+
+```{r}
+time_series <- ts(filtered_data$Date, frequency = 1)
+```
+```{r}
+adf.test(time_series)
+```
+```{r}
+# Using the 'acf' function to create the autocorrelation plot
+acf(time_series, main="Autocorrelation of Time_float")
+```
+
+
+
+
+
+
+```{r}
+diff_series <- diff(time_series)
+
+```
+```{r}
+arima_model <- auto.arima(time_series)
+summary(arima_model)
+
+```
+```{r}
+residuals <- residuals(arima_model)
+
+```
+
+
+
+```{r}
+# Time plot of residuals
+plot(residuals, main="Residuals Time Plot")
+
+# ACF plot of residuals
+acf(residuals, main="ACF of Residuals")
+
+# Histogram of residuals
+hist(residuals, main="Histogram of Residuals")
+
+# Q-Q plot of residuals
+qqnorm(residuals)
+qqline(residuals)
+
+```
+
+```{r}
+forecast_values <- forecast(arima_model, h = 10)  
+
+```
+
+```{r}
+plot(forecast_values)
+
+```
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(tseries)
+library(forecast)
+
+# Convert the Date column to Date type if it's not already
+filtered_data$Date <- as.Date(filtered_data$Date)
+
+# Aggregate data by day, week, or month
+# Example: Aggregating by day
+daily_data <- filtered_data %>%
+  group_by(Date) %>%
+  summarise(Count = n())
+
+# Create a ts object
+daily_ts <- ts(daily_data$Count, start=c(year(min(daily_data$Date)), month(min(daily_data$Date))), frequency=365)
+
+# Decompose the time series
+decomposed_ts <- decompose(daily_ts)
+
+# Plot the decomposed time series
+plot(decomposed_ts)
+```
+```{r}
+library(fpp3) # For time series modeling and analysis
+
+filtered_data$Date <- as.Date(filtered_data$Date, format = "%m/%d/%Y")
+
+# Check for missing dates and fill them
+all_dates <- seq(min(filtered_data$Date), max(filtered_data$Date), by="day")
+daily_crime_data <- filtered_data %>%
+  count(Date) %>%
+  complete(Date = all_dates, fill = list(n = 0)) # Fill missing dates with 0 count
+
+# Check for non-numeric data
+daily_crime_data$Count <- as.numeric(daily_crime_data$n)
+
+# Now the time series tsibble should have no missing dates and numeric count
+daily_crime_tsibble <- as_tsibble(daily_crime_data, index = Date)
+
+# Check the structure of the tsibble to ensure it's correct
+str(daily_crime_tsibble)
+
+# Apply the models
+fit <- daily_crime_tsibble %>%
+  model(
+    Naive = NAIVE(Count),
+    Seasonal_Naive = SNAIVE(Count),
+    Drift = RW(Count ~ drift())
+  )
+
+# Calculate accuracy
+accuracy_fit <- accuracy(fit)
+
+# Print the accuracy
+print(accuracy_fit)
+```
+
+```{r}
+
+```
+```{r}
+
+forecasts <- fit %>%
+  forecast(h = "5 year")
+
+plot <- autoplot(forecasts) +
+  labs(title = "Crime Count Forecasts", x = "Date", y = "Crime Count") +
+  theme_minimal()
+accuracy(fit)
+plot
+```
+
+
+
+```{r}
+library(forecast)
+library(tidyverse)
+library(lubridate)
+
+# Ensure the 'Date' column is in the Date format
+filtered_data$Date <- as.Date(filtered_data$Date, format = "%m/%d/%Y")
+
+# Aggregate crime data by date to create a time series
+crime_by_date <- filtered_data %>%
+  count(Date) %>%
+  # Ensure no missing dates
+  complete(Date = seq(min(Date), max(Date), by="day"), fill=list(n=0)) %>%
+  # Create a time series (ts) object
+  mutate(Date = as.numeric(as.Date(Date))) %>%
+  arrange(Date)
+
+# The 'ts' function requires a numeric vector, so we only pass the counts
+crime_ts <- ts(crime_by_date$n, start=min(crime_by_date$Date), frequency=365)
+
+# Fit an ETS model to the time series data
+ets_model <- ets(crime_ts)
+
+# Check the model summary
+summary(ets_model)
+
+# Forecast the next periods (e.g., the next year)
+ets_forecast <- forecast(ets_model, h= 60)
+
+# Plot the forecast
+autoplot(ets_forecast)
+```
+```{r}
+library(forecast)
+library(ggplot2)
+
+# Plotting the forecast
+forecast_plot <- autoplot(ets_forecast) +
+  ggtitle("ETS Model Forecast") +
+  xlab("Time") +
+  ylab("Crime Count") +
+  theme_minimal()
+
+print(forecast_plot)
+
+# Residual analysis
+residuals_df <- data.frame(Time = time(ets_model$residuals),
+                           Residuals = as.numeric(ets_model$residuals))
+
+residual_plot <- ggplot(residuals_df, aes(x = Time, y = Residuals)) +
+  geom_line() +
+  ggtitle("Residuals of ETS Model") +
+  xlab("Time") +
+  ylab("Residuals") +
+  theme_light()
+
+print(residual_plot)
+
+# Optionally, you can also plot a histogram or a density plot for residuals
+histogram_residuals <- ggplot(residuals_df, aes(x = Residuals)) +
+  geom_histogram(binwidth = 1, fill="blue", color="black") +
+  ggtitle("Histogram of Residuals") +
+  xlab("Residuals") +
+  ylab("Frequency") +
+  theme_classic()
+
+print(histogram_residuals)
+
+density_residuals <- ggplot(residuals_df, aes(x = Residuals)) +
+  geom_density(fill="lightblue") +
+  ggtitle("Density Plot of Residuals") +
+  xlab("Residuals") +
+  ylab("Density") +
+  theme_bw()
+
+print(density_residuals)
+```
+```{r}
+# Load necessary libraries
+library(forecast)
+library(ggplot2)
+
+# Perform Ljung-Box test
+lb_test <- Box.test(ets_model$residuals, lag=log(length(ets_model$residuals)))
+
+# Print the Ljung-Box test results
+print(lb_test)
+
+# Create a histogram of the residuals
+ggplot(data.frame(Residuals = ets_model$residuals), aes(x = Residuals)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black") +
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Frequency") +
+  theme_minimal()
+
+# Create a Q-Q plot of the residuals
+qqnorm(ets_model$residuals)
+qqline(ets_model$residuals, col = "red", lwd = 2)
+```
+
+
+```{r}
+# Load the necessary library
+library(forecast)
+
+# Plot the ACF of the residuals
+acf_res <- Acf(ets_model$residuals, main="Autocorrelation Function of Residuals")
+
+# Plot the PACF of the residuals
+pacf_res <- Pacf(ets_model$residuals, main="Partial Autocorrelation Function of Residuals")
+
+```
+
+
+
+
