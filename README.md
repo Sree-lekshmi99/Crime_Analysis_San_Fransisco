@@ -48,4 +48,5 @@ The dataset consists of historical crime records with the following key attribut
    ```bash
    git clone https://github.com/yourusername/sf_crime_analysis.git
 Install required R packages:
+ ```bash
 install.packages(c("dplyr", "tidyr", "ggplot2", "forecast", "lubridate", "leaflet"))
